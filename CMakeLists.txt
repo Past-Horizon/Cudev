@@ -23,15 +23,22 @@ else()
 endif()
 
 set_target_properties (Cudev PROPERTIES
-	OUTPUT_NAME "NeoWPF.${CUDEV_PLATFORM}.$<CONFIG>.${CUDEV_VERSION}"
+	OUTPUT_NAME "Cudev.${CUDEV_PLATFORM}.$<CONFIG>.${CUDEV_VERSION}"
 )
 
 include (CTest)
 if (BUILD_TESTING)
+	if (DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+		list (PREPEND CMAKE_PREFIX_PATH
+			"${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
+		)
+	endif()
+
 	find_package (GTest CONFIG REQUIRED)
 
 	add_executable (CudevTests
-		tests/CudevTests.cpp
+		tests/CoreTests.cpp
+		tests/Utf8Tests.cpp
 	)
 
 	target_link_libraries (CudevTests

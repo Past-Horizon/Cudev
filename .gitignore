@@ -6,3 +6,4 @@ output.txt
 vcpkg_installed
 private
 CudevBuild
+tests/out/
