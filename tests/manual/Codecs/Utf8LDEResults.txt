@@ -1,0 +1,21 @@
+No failures logged.
+
+==========================
+UTF 8
+Iterations: 263262
+Cases: 6055019
+Valid samples per iteration: 7
+Invalid samples per iteration: 16
+Elapsed seconds: 1370.58
+Iterations per second: 192.081
+Samples per second: 4417.86
+
+UTF 16
+Iterations: 133143
+Cases: 3062273
+Valid samples per iteration: 7
+Invalid samples per iteration: 16
+Dynamic UTF-16 cases: 1331410
+Elapsed seconds: 909.49
+Iterations per second: 146.393
+Samples per second: 3367.02

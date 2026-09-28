@@ -39,6 +39,7 @@ if (BUILD_TESTING)
 	add_executable (CudevTests
 		tests/CoreTests.cpp
 		tests/Utf8Tests.cpp
+		tests/Utf16Tests.cpp
 	)
 
 	target_link_libraries (CudevTests

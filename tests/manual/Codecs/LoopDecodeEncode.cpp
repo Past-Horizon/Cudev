@@ -1,8 +1,10 @@
 #include <Cudev/Utf/8/U8Codec.h>
+#include <Cudev/Utf/16/U16Codec.h>
 
 #include <conio.h>
 #include <cstdio>
 #include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -22,6 +24,12 @@ struct InvalidSample
 {
     std::string name;
     std::string bytes;
+    Cudev::CodecError error;
+};
+
+struct Utf16InvalidSample
+{
+    std::u16string value;
     Cudev::CodecError error;
 };
 
@@ -114,6 +122,62 @@ std::vector<InvalidSample> BuildInvalidSamples()
         {"valid-prefix-then-invalid", Bytes({0x41, 0xE1, 0x80, 0x41}), Cudev::CodecError::InvalidContinuationByte},
         {"invalid-prefix-then-valid", Bytes({0xE1, 0x80, 0x41, 0x41}), Cudev::CodecError::InvalidContinuationByte}
     };
+}
+
+char32_t NextScalar(std::uint32_t& state)
+{
+    state = state * 1664525u + 1013904223u;
+    auto codePoint = static_cast<char32_t>(state % 0x110000u);
+    if (codePoint >= 0xD800 && codePoint <= 0xDFFF)
+    {
+        codePoint += 0x800;
+    }
+
+    return codePoint;
+}
+
+std::u32string BuildDynamicUtf16Sample(std::size_t iteration, std::size_t sampleIndex)
+{
+    std::uint32_t state = static_cast<std::uint32_t>(
+        0x9E3779B9u ^ iteration ^ (sampleIndex * 0x85EBCA6Bu));
+    const auto length = 1u + (state % (1u + static_cast<unsigned int>(
+        1u + (iteration % 4096u))));
+    std::u32string sample;
+    sample.reserve(length + 8);
+
+    for (unsigned int index = 0; index < length; ++index)
+    {
+        sample.push_back(NextScalar(state));
+    }
+
+    sample.insert(sample.begin(), {0, 0xD7FF, 0xE000, 0x10000, 0x10FFFF});
+    return sample;
+}
+
+Utf16InvalidSample BuildDynamicUtf16InvalidSample(
+    std::size_t iteration,
+    std::size_t sampleIndex)
+{
+    const auto selector = static_cast<unsigned int>((iteration * 7 + sampleIndex) % 6);
+    const char16_t highSurrogate = static_cast<char16_t>(0xD800);
+    const char16_t lowSurrogate = static_cast<char16_t>(0xDC00);
+
+    switch (selector)
+    {
+    case 0:
+        return {{lowSurrogate}, Cudev::CodecError::SurrogateCodePoint};
+    case 1:
+        return {{highSurrogate}, Cudev::CodecError::TruncatedSequence};
+    case 2:
+        return {{highSurrogate, highSurrogate}, Cudev::CodecError::SurrogateCodePoint};
+    case 3:
+        return {{highSurrogate, u'A'}, Cudev::CodecError::SurrogateCodePoint};
+    case 4:
+        return {{u'A', lowSurrogate}, Cudev::CodecError::SurrogateCodePoint};
+    default:
+        return {{highSurrogate, lowSurrogate, lowSurrogate},
+            Cudev::CodecError::SurrogateCodePoint};
+    }
 }
 
 std::string HexPreview(std::string_view value)
@@ -242,6 +306,63 @@ bool CheckInvalidSample(
     return true;
 }
 
+bool CheckUtf16Sample(
+    const Cudev::Utf16::U16Codec& codec,
+    const std::u32string& sample,
+    std::size_t iteration,
+    std::size_t sampleIndex,
+    std::string_view logPath)
+{
+    const auto encoded = codec.Encode(sample);
+    const Sample logSample{"utf16-dynamic-" + std::to_string(sampleIndex), sample};
+    if (encoded.failed())
+    {
+        LogFailure(logPath, iteration, logSample, "utf16-encode", ErrorName(*encoded.error()));
+        return false;
+    }
+
+    const auto validation = codec.Validate(encoded.value());
+    if (validation.failed())
+    {
+        LogFailure(logPath, iteration, logSample, "utf16-validate-encoded", ErrorName(*validation.error()));
+        return false;
+    }
+
+    const auto decoded = codec.Decode(encoded.value());
+    if (decoded.failed() || decoded.value() != sample)
+    {
+        LogFailure(logPath, iteration, logSample, "utf16-decode-or-compare", "round-trip mismatch");
+        return false;
+    }
+
+    return true;
+}
+
+bool CheckUtf16InvalidSample(
+    const Cudev::Utf16::U16Codec& codec,
+    const Utf16InvalidSample& sample,
+    std::size_t iteration,
+    std::size_t sampleIndex,
+    std::string_view logPath)
+{
+    const Sample logSample{"utf16-invalid-" + std::to_string(sampleIndex), {}};
+    const auto validation = codec.Validate(sample.value);
+    if (validation.succeeded() || !validation.error() || *validation.error() != sample.error)
+    {
+        LogFailure(logPath, iteration, logSample, "utf16-invalid-validate", "unexpected result");
+        return false;
+    }
+
+    const auto decoded = codec.Decode(sample.value);
+    if (decoded.succeeded() || !decoded.error() || *decoded.error() != sample.error)
+    {
+        LogFailure(logPath, iteration, logSample, "utf16-invalid-decode", "unexpected result");
+        return false;
+    }
+
+    return true;
+}
+
 }
 
 int main()
@@ -250,12 +371,14 @@ int main()
     const auto samples = BuildSamples();
     const auto invalidSamples = BuildInvalidSamples();
     const Cudev::Utf8::U8Codec codec;
+    const Cudev::Utf16::U16Codec utf16Codec;
     StopKeyPoller stopKey;
     std::size_t iteration = 0;
     std::size_t sampleCount = 0;
+    std::size_t utf16CaseCount = 0;
     const auto start = std::chrono::steady_clock::now();
 
-    std::cout << "Running UTF-8 loop. Press g to stop.\n"
+    std::cout << "Running UTF-8 and UTF-16 stress loop. Press g to stop.\n"
               << "Failure details will be written to " << logPath << '\n';
 
     while (true)
@@ -313,6 +436,54 @@ int main()
             }
         }
 
+        if (stopRequested)
+        {
+            ++iteration;
+            break;
+        }
+
+        const auto dynamicSampleCount = 1u + static_cast<unsigned int>((iteration * 13) % 12);
+        for (unsigned int sampleIndex = 0; sampleIndex < dynamicSampleCount; ++sampleIndex)
+        {
+            const auto sample = BuildDynamicUtf16Sample(iteration, sampleIndex);
+            if (!CheckUtf16Sample(utf16Codec, sample, iteration, sampleIndex, logPath))
+            {
+                std::cerr << "UTF-16 dynamic stress test failed at iteration "
+                          << iteration << ", sample " << sampleIndex << '\n';
+                std::cout << "Press Enter to exit.\n";
+                std::cin.get();
+                return 1;
+            }
+
+            ++utf16CaseCount;
+            if (stopKey.StopRequested())
+            {
+                stopRequested = true;
+                break;
+            }
+        }
+
+        const auto dynamicInvalidCount = 1u + static_cast<unsigned int>((iteration * 5) % 6);
+        for (unsigned int sampleIndex = 0; sampleIndex < dynamicInvalidCount; ++sampleIndex)
+        {
+            const auto sample = BuildDynamicUtf16InvalidSample(iteration, sampleIndex);
+            if (!CheckUtf16InvalidSample(utf16Codec, sample, iteration, sampleIndex, logPath))
+            {
+                std::cerr << "UTF-16 invalid stress test failed at iteration "
+                          << iteration << ", sample " << sampleIndex << '\n';
+                std::cout << "Press Enter to exit.\n";
+                std::cin.get();
+                return 1;
+            }
+
+            ++utf16CaseCount;
+            if (stopKey.StopRequested())
+            {
+                stopRequested = true;
+                break;
+            }
+        }
+
         ++iteration;
         if (stopRequested || stopKey.StopRequested())
         {
@@ -330,6 +501,7 @@ int main()
               << "Cases: " << sampleCount << '\n'
               << "Valid samples per iteration: " << samples.size() << '\n'
               << "Invalid samples per iteration: " << invalidSamples.size() << '\n'
+              << "Dynamic UTF-16 cases: " << utf16CaseCount << '\n'
               << "Elapsed seconds: " << elapsed << '\n'
               << "Iterations per second: " << iterationsPerSecond << '\n'
               << "Samples per second: " << samplesPerSecond << '\n'
