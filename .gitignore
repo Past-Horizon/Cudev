@@ -1,0 +1,8 @@
+.vs
+.vscode
+out
+out.txt
+output.txt
+vcpkg_installed
+private
+CudevBuild

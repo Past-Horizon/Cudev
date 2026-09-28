@@ -1,0 +1,4 @@
+file(GLOB_RECURSE CUDEV_SOURCES
+  "${CMAKE_CURRENT_LIST_DIR}/../src/*.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/../include/*.h"
+)
