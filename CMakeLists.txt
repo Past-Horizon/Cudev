@@ -40,6 +40,7 @@ if (BUILD_TESTING)
 		tests/CoreTests.cpp
 		tests/Utf8Tests.cpp
 		tests/Utf16Tests.cpp
+		tests/Utf32Tests.cpp
 	)
 
 	target_link_libraries (CudevTests
