@@ -41,6 +41,8 @@ if (BUILD_TESTING)
 		tests/Utf8Tests.cpp
 		tests/Utf16Tests.cpp
 		tests/Utf32Tests.cpp
+		tests/UtfConvertTests.cpp
+		tests/WideCodecTests.cpp
 	)
 
 	target_link_libraries (CudevTests
