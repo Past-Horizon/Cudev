@@ -31,8 +31,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-	include (CTest)
-	if (BUILD_TESTING)
+	option (CUDEV_BUILD_TESTS "Build Cudev tests" OFF)
+	if (CUDEV_BUILD_TESTS)
 		if (DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
 			list (PREPEND CMAKE_PREFIX_PATH
 				"${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
@@ -40,6 +40,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 		endif()
 
 		find_package (GTest CONFIG REQUIRED)
+		enable_testing ()
 
 		add_executable (CudevTests
 			tests/CoreTests.cpp
