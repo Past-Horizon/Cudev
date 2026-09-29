@@ -26,32 +26,38 @@ set_target_properties (Cudev PROPERTIES
 	OUTPUT_NAME "Cudev.${CUDEV_PLATFORM}.$<CONFIG>.${CUDEV_VERSION}"
 )
 
-include (CTest)
-if (BUILD_TESTING)
-	if (DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
-		list (PREPEND CMAKE_PREFIX_PATH
-			"${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	set_target_properties (Cudev PROPERTIES PREFIX "")
+endif()
+
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+	include (CTest)
+	if (BUILD_TESTING)
+		if (DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+			list (PREPEND CMAKE_PREFIX_PATH
+				"${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
+			)
+		endif()
+
+		find_package (GTest CONFIG REQUIRED)
+
+		add_executable (CudevTests
+			tests/CoreTests.cpp
+			tests/Utf8Tests.cpp
+			tests/Utf16Tests.cpp
+			tests/Utf32Tests.cpp
+			tests/UtfConvertTests.cpp
+			tests/WideCodecTests.cpp
 		)
+
+		target_link_libraries (CudevTests
+			PRIVATE
+				Cudev
+				GTest::gtest_main
+		)
+
+		include (GoogleTest)
+		gtest_discover_tests (CudevTests)
 	endif()
-
-	find_package (GTest CONFIG REQUIRED)
-
-	add_executable (CudevTests
-		tests/CoreTests.cpp
-		tests/Utf8Tests.cpp
-		tests/Utf16Tests.cpp
-		tests/Utf32Tests.cpp
-		tests/UtfConvertTests.cpp
-		tests/WideCodecTests.cpp
-	)
-
-	target_link_libraries (CudevTests
-		PRIVATE
-			Cudev
-			GTest::gtest_main
-	)
-
-	include (GoogleTest)
-	gtest_discover_tests (CudevTests)
 endif()
 
