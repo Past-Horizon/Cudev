@@ -1,6 +1,6 @@
 #include <Cudev/Utf/16/U16Codec.h>
 
-#include <Cudev/Utf/Common/ScalarValue.h>
+#include <Cudev/Utf/Common/ScalarValidation.h>
 
 namespace Cudev::Utf16 {
 
@@ -11,12 +11,9 @@ Result<std::u16string, CodecError> U16Codec::Encode(std::u32string_view input) c
 
     for (const char32_t codePoint : input)
     {
-        if (!Utf::IsScalarValue(codePoint))
+        if (const auto error = Utf::ValidateScalarValue(codePoint))
         {
-            const auto error = codePoint > 0x10FFFF
-                ? CodecError::CodePointOutOfRange
-                : CodecError::SurrogateCodePoint;
-            return Result<std::u16string, CodecError>::failure(error);
+            return Result<std::u16string, CodecError>::failure(*error);
         }
 
         if (codePoint <= 0xFFFF)

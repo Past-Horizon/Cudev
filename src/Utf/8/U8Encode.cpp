@@ -1,6 +1,6 @@
 #include <Cudev/Utf/8/U8Codec.h>
 
-#include <Cudev/Utf/Common/ScalarValue.h>
+#include <Cudev/Utf/Common/ScalarValidation.h>
 
 namespace Cudev::Utf8 {
 
@@ -11,12 +11,9 @@ Result<std::string, CodecError> U8Codec::Encode(std::u32string_view input) const
 
     for (const char32_t codePoint : input)
     {
-        if (!Utf::IsScalarValue(codePoint))
+        if (const auto error = Utf::ValidateScalarValue(codePoint))
         {
-            const auto error = codePoint > 0x10FFFF
-                ? CodecError::CodePointOutOfRange
-                : CodecError::SurrogateCodePoint;
-            return Result<std::string, CodecError>::failure(error);
+            return Result<std::string, CodecError>::failure(*error);
         }
 
         if (codePoint <= 0x7F)
