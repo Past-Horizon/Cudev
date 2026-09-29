@@ -1,4 +1,9 @@
-﻿#pragma once
+/*
+MIT License — Copyright (c) 2026 Cudev
+See LICENSE file in the project root for full license text.
+*/
+
+#pragma once
 
 #include <Cudev/Core/Result.h>
 #include <Cudev/Core/CodecError.h>
